@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 탐색 알고리즘 시뮬레이터 v5.2 (Final)</title>
+    <title>AI 탐색 알고리즘 시뮬레이터</title>
     <style>
         :root {
             --primary-color: #007bff;
@@ -240,7 +240,7 @@
 
     <div class="container">
         <div class="controls">
-            <h2>제어판</h2>
+            <h2>✅ 사용 안내 및 설정</h2>
             <div class="control-group">
                 <p class="info">
                     <strong>노드 이동</strong>: 드래그<br>
@@ -301,6 +301,7 @@
         const goalNodeDisplay = document.getElementById('goal-node-display');
         const log = document.getElementById('log');
         const heuristicInputsContainer = document.getElementById('heuristic-inputs');
+        const heuristicsPanel = document.querySelector('.heuristics'); // 휴리스틱 패널 DOM 요소
 
         let graphData = { nodes: {}, edges: [] };
         let startNode = null;
@@ -313,9 +314,6 @@
         let currentInteractionMode = 'none';
         let firstNodeForConnection = null;
 
-        /**
-         * [수정됨] 휴리스틱 및 가중치 값 조정
-         */
         function generateRandomGraph() {
             const numNodes = Math.floor(Math.random() * 5) + 3;
             const newNodes = {};
@@ -347,14 +345,14 @@
                 for (const id in newNodes) {
                     const node = newNodes[id];
                     const distance = Math.sqrt(Math.pow(node.x - goalRefNode.x, 2) + Math.pow(node.y - goalRefNode.y, 2));
-                    node.h = Math.round(distance / 5); // 휴리스틱 값 스케일 조정
+                    node.h = Math.round(distance / 5);
                 }
             }
             
             for (let i = 0; i < numNodes; i++) {
                 const fromNode = nodeIds[i];
                 const toNode = nodeIds[(i + 1) % numNodes];
-                newEdges.push({ from: fromNode, to: toNode, cost: Math.floor(Math.random() * 31) + 10 }); // 가중치 10~40
+                newEdges.push({ from: fromNode, to: toNode, cost: Math.floor(Math.random() * 31) + 10 });
             }
             const extraEdges = Math.floor(numNodes / 2);
             for (let i = 0; i < extraEdges; i++) {
@@ -364,14 +362,14 @@
                     const edgeExists = newEdges.some(e => (e.from === nodeA && e.to === nodeB) || (e.from === nodeB && e.to === nodeA));
                     const areAdjacentInCycle = Math.abs(nodeIds.indexOf(nodeA) - nodeIds.indexOf(nodeB)) % (numNodes - 1) === 1;
                     if (!edgeExists && !areAdjacentInCycle) {
-                        newEdges.push({ from: nodeA, to: nodeB, cost: Math.floor(Math.random() * 31) + 10 }); // 가중치 10~40
+                        newEdges.push({ from: nodeA, to: nodeB, cost: Math.floor(Math.random() * 31) + 10 });
                     }
                 }
             }
-
             graphData = { nodes: newNodes, edges: newEdges };
         }
 
+        // --- 핵심 기능 함수들 (생략) ---
         function logMessage(message) { log.innerHTML += `<p>${message}</p>`; log.scrollTop = log.scrollHeight; }
         function updateNodeClass(nodeId, className, add = true) { const nodeElement = document.getElementById(`node-${nodeId}`); if (nodeElement) { if (add) nodeElement.classList.add(className); else nodeElement.classList.remove(className); } }
         function updateEdgeClass(from, to, className, add = true) { const edgeId = [from, to].sort().join('-'); const edgeElement = document.getElementById(`edge-${edgeId}`); if(edgeElement) { if (add) edgeElement.classList.add(className); else edgeElement.classList.remove(className); } }
@@ -431,22 +429,26 @@
         clearBtn.addEventListener('click', () => reset(false));
         resetBtn.addEventListener('click', () => reset(true));
 
+        /** [새로운 기능] 알고리즘 선택에 따른 휴리스틱 패널 표시/숨김 */
+        algorithmSelect.addEventListener('change', (e) => {
+            const selected = e.target.value;
+            if (selected === 'greedy' || selected === 'astar') {
+                heuristicsPanel.style.display = 'block';
+            } else {
+                heuristicsPanel.style.display = 'none';
+            }
+        });
+
         function getMousePosition(evt) { const CTM = svg.getScreenCTM(); return { x: (evt.clientX - CTM.e) / CTM.a, y: (evt.clientY - CTM.f) / CTM.d }; }
 
-        /** [수정됨] mousedown, click, mouseup 로직 분리 및 명확화 */
-        
         function handleNodeMouseDown(e, nodeId) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (isRunning) return;
-            wasDragged = false; // 드래그 상태 초기화
-
-            if (e.shiftKey || e.ctrlKey || e.metaKey) return; // 키 조합은 click에서 처리
+            e.preventDefault(); e.stopPropagation(); if (isRunning) return;
+            wasDragged = false;
+            if (e.altKey || e.shiftKey || e.ctrlKey || e.metaKey) return; // 드래그는 순수 마우스 클릭만
             
             selectedNode = document.getElementById(`node-${nodeId}`);
             selectedNode.classList.add('dragging');
-            const pos = getMousePosition(e);
-            const { x, y } = graphData.nodes[nodeId];
+            const pos = getMousePosition(e); const { x, y } = graphData.nodes[nodeId];
             offset = { x: pos.x - x, y: pos.y - y };
         }
 
@@ -464,21 +466,17 @@
         function handleGlobalMouseUp(e) {
             if (selectedNode) {
                 selectedNode.classList.remove('dragging');
-                if (wasDragged) {
-                    drawGraph(); 
-                    reset(false);
-                }
+                if (wasDragged) { drawGraph(); reset(false); }
             }
             selectedNode = null;
-            setTimeout(() => { wasDragged = false; }, 0); // 드래그 상태 최종 초기화
+            setTimeout(() => { wasDragged = false; }, 0);
         }
 
-        // 전역 클릭 핸들러 (노드 추가 및 선택 로직)
         svg.addEventListener('click', (e) => {
             if (isRunning) return;
             const nodeElement = e.target.closest('.node');
 
-            if (nodeElement) { // 노드 위에서 클릭
+            if (nodeElement) {
                 const nodeId = nodeElement.id.replace('node-', '');
                 if (wasDragged) return;
 
@@ -498,15 +496,14 @@
                         firstNodeForConnection = null;
                         currentInteractionMode = 'none';
                     }
-                } else { // 일반 클릭 (시작/종료점 선택)
+                } else {
                     handleStartGoalSelection(nodeId);
                 }
-            } else { // 빈 공간에서 클릭
+            } else {
                 if (e.altKey && !e.shiftKey) {
                     const pos = getMousePosition(e);
                     addNode(pos.x, pos.y);
                 }
-                // 간선 추가/삭제 모드 취소
                 firstNodeForConnection = null;
                 currentInteractionMode = 'none';
             }
@@ -525,7 +522,13 @@
             }
         }
 
-        function deleteNode(nodeId) { /* ... */ }
+        function deleteNode(nodeId) {
+            delete graphData.nodes[nodeId];
+            graphData.edges = graphData.edges.filter(edge => edge.from !== nodeId && edge.to !== nodeId);
+            if (startNode === nodeId) { startNode = null; startNodeDisplay.textContent = '없음'; }
+            if (goalNode === nodeId) { goalNode = null; goalNodeDisplay.textContent = '없음'; }
+            drawGraph(); createHeuristicInputs(); reset(false);
+        }
         function addNode(x, y) { /* ... */ }
         function addEdge(fromNode, toNode) { /* ... */ }
         function deleteEdge(node1, node2) { /* ... */ }
@@ -535,9 +538,11 @@
         svg.addEventListener('mouseup', handleGlobalMouseUp);
         svg.addEventListener('mouseleave', handleGlobalMouseUp);
 
+        // 초기 실행 시 휴리스틱 패널 상태 설정
+        algorithmSelect.dispatchEvent(new Event('change'));
         reset(true);
         
-        // --- 생략된 함수 본문들 ---
+        // --- 생략된 함수 본문들 (이전과 동일) ---
         function createHeuristicInputs() {heuristicInputsContainer.innerHTML = '';Object.keys(graphData.nodes).forEach(id => {const div = document.createElement('div'); div.classList.add('heuristic-input');const label = document.createElement('label'); label.setAttribute('for', `h-input-${id}`); label.textContent = `노드 ${id}의 h(n) 값:`;const input = document.createElement('input'); input.type = 'number'; input.id = `h-input-${id}`; input.value = graphData.nodes[id].h; input.min = 0; input.max = 999;input.addEventListener('change', (e) => {let newValue = parseInt(e.target.value, 10);if (!isNaN(newValue)) {newValue = Math.max(0, newValue); e.target.value = newValue;graphData.nodes[id].h = newValue;document.getElementById(`h-text-${id}`).textContent = `h=${newValue}`;}});div.appendChild(label); div.appendChild(input); heuristicInputsContainer.appendChild(div);});}
         async function reconstructPath(cameFrom, current) {let totalCost = 0;const path = [];let temp = current;while(temp) {path.unshift(temp);const parent = cameFrom[temp]?.node;if(parent) {const edge = graphData.edges.find(e => (e.from === parent && e.to === temp) || (e.from === temp && e.to === parent));if(edge) totalCost += edge.cost;}temp = parent;}logMessage(`✅ 최종 경로: ${path.join(' -> ')}`);logMessage(`💰 총 비용: ${totalCost}`);for(let i=0; i < path.length; i++){updateNodeClass(path[i], 'path');if(i > 0){updateEdgeClass(path[i-1], path[i], 'path');}await sleep(150);}}
         async function bfs() {logMessage("--- 너비 우선 탐색 (BFS) 시작 ---");let queue = [{node: startNode, path: [startNode]}];let visited = new Set([startNode]);const cameFrom = {[startNode]: null};while (queue.length > 0) {const { node: current } = queue.shift();updateNodeClass(current, 'current');logMessage(`👀 방문 노드: ${current}`);await sleep(500);if (current === goalNode) {logMessage("🎉 목표 노드에 도달했습니다!");updateNodeClass(current, 'current', false);await reconstructPath(cameFrom, current);return;}const neighbors = graphData.edges.filter(e => e.from === current || e.to === current).map(e => e.from === current ? e.to : e.from);for (const neighbor of neighbors) {if (!visited.has(neighbor)) {visited.add(neighbor);cameFrom[neighbor] = {node: current};queue.push({node: neighbor});updateNodeClass(neighbor, 'visited');logMessage(`  - 이웃 ${neighbor}를 대기큐에 추가`);}}updateNodeClass(current, 'current', false);if(current !== startNode) updateNodeClass(current, 'visited');}logMessage("❌ 목표 노드를 찾지 못했습니다.");}
@@ -546,7 +551,7 @@
         async function astar() {logMessage("--- A* 탐색 시작 ---");let openList = [{ node: startNode, g: 0, h: graphData.nodes[startNode].h, f: graphData.nodes[startNode].h }];let cameFrom = { [startNode]: null };let gScore = {};Object.keys(graphData.nodes).forEach(node => gScore[node] = Infinity);gScore[startNode] = 0;while (openList.length > 0) {openList.sort((a, b) => a.f - b.f);const currentItem = openList.shift();const current = currentItem.node;updateNodeClass(current, 'current');logMessage(`👀 방문 노드: ${current} (g=${currentItem.g}, h=${currentItem.h}, f=${currentItem.f})`);await sleep(500);if (current === goalNode) {logMessage("🎉 목표 노드에 도달했습니다!");updateNodeClass(current, 'current', false);await reconstructPath(cameFrom, current);return;}if(current !== startNode) updateNodeClass(current, 'visited');const neighbors = graphData.edges.filter(e => e.from === current || e.to === current);for (const edge of neighbors) {const neighbor = edge.from === current ? edge.to : edge.from;const tentativeGScore = gScore[current] + edge.cost;if (tentativeGScore < gScore[neighbor]) {cameFrom[neighbor] = { node: current };gScore[neighbor] = tentativeGScore;const hScore = graphData.nodes[neighbor].h;const fScore = tentativeGScore + hScore;if (!openList.some(item => item.node === neighbor)) {openList.push({ node: neighbor, g: tentativeGScore, h: hScore, f: fScore });updateNodeClass(neighbor, 'visited');logMessage(`  - 이웃 ${neighbor}(f=${fScore})를 목록에 추가`);}}}updateNodeClass(current, 'current', false);}logMessage("❌ 목표 노드를 찾지 못했습니다.");}
         function reset(fullReset = true) {log.innerHTML = '';Object.keys(graphData.nodes).forEach(id => {const nodeElement = document.getElementById(`node-${id}`);if (nodeElement) nodeElement.classList.remove('visited', 'current', 'path');});graphData.edges.forEach(({ from, to }) => updateEdgeClass(from, to, 'path', false));if (fullReset) {startNode = null; goalNode = null;startNodeDisplay.textContent = '없음'; goalNodeDisplay.textContent = '없음';Object.keys(graphData.nodes).forEach(id => {updateNodeClass(id, 'start', false); updateNodeClass(id, 'goal', false);});generateRandomGraph();drawGraph();createHeuristicInputs();startBtn.disabled = false;} else {if(startNode) updateNodeClass(startNode, 'start');if(goalNode) updateNodeClass(goalNode, 'goal');}}
         function updateConnectedEdges(nodeId, newX, newY) {graphData.edges.forEach(({from, to}) => {if (from === nodeId || to === nodeId) {const edgeId = [from, to].sort().join('-');const edgeEl = document.getElementById(`edge-${edgeId}`);if (edgeEl) {if (from === nodeId) { edgeEl.setAttribute('x1', newX); edgeEl.setAttribute('y1', newY); } else { edgeEl.setAttribute('x2', newX); edgeEl.setAttribute('y2', newY); }const costText = Array.from(edgeEl.parentNode.children).find(child => child.classList.contains('edge-cost') && child.previousSibling === edgeEl);if(costText) {const nodeFrom = graphData.nodes[from]; const nodeTo = graphData.nodes[to];const midX = (nodeFrom.x + nodeTo.x) / 2; const midY = (nodeFrom.y + nodeTo.y) / 2;const angle = Math.atan2(nodeTo.y - nodeFrom.y, nodeTo.x - nodeFrom.x); const textOffset = 15;costText.setAttribute('x', midX + textOffset * Math.sin(angle));costText.setAttribute('y', midY - textOffset * Math.cos(angle));}}}});}
-        function addNode(x, y) {let nextChar = 'A';const existingIds = Object.keys(graphData.nodes);while (existingIds.includes(nextChar)) {nextChar = String.fromCharCode(nextChar.charCodeAt(0) + 1);}graphData.nodes[nextChar] = { x, y, h: 0 }; const nodeIds = Object.keys(graphData.nodes); if(nodeIds.length > 1) { const goalRefId = nodeIds[nodeIds.length-2]; const goalRefNode = graphData.nodes[goalRefId]; for(const id in graphData.nodes) { const node = graphData.nodes[id]; const distance = Math.sqrt(Math.pow(node.x - goalRefNode.x, 2) + Math.pow(node.y - goalRefNode.y, 2)); node.h = Math.round(distance/5); } }drawGraph();createHeuristicInputs();}
+        function addNode(x, y) {let nextChar = 'A';const existingIds = Object.keys(graphData.nodes);while (existingIds.includes(nextChar)) {nextChar = String.fromCharCode(nextChar.charCodeAt(0) + 1);}graphData.nodes[nextChar] = { x, y, h: 0 }; const nodeIds = Object.keys(graphData.nodes); if(nodeIds.length > 1) { const goalRefId = nodeIds.find(id => id !== nextChar); const goalRefNode = graphData.nodes[goalRefId]; for(const id in graphData.nodes) { const node = graphData.nodes[id]; const distance = Math.sqrt(Math.pow(node.x - goalRefNode.x, 2) + Math.pow(node.y - goalRefNode.y, 2)); node.h = Math.round(distance/5); } }drawGraph();createHeuristicInputs();}
         function addEdge(fromNode, toNode) {const edgeExists = graphData.edges.some(e => (e.from === fromNode && e.to === toNode) || (e.from === toNode && e.to === fromNode));if (edgeExists) { alert("이미 간선이 존재합니다."); return; }const costStr = prompt(`'${fromNode}'와 '${toNode}'를 잇는 간선 비용(10-40)을 입력하세요:`, "25");if (costStr !== null) {const cost = parseInt(costStr, 10);if (!isNaN(cost) && cost >= 10 && cost <= 40) {graphData.edges.push({ from: fromNode, to: toNode, cost: cost });drawGraph();reset(false);} else { alert("10부터 40 사이의 유효한 숫자를 입력해야 합니다."); }}}
         function deleteEdge(node1, node2) {const edgeIndex = graphData.edges.findIndex(e => (e.from === node1 && e.to === node2) || (e.from === node2 && e.to === node1));if (edgeIndex > -1) {graphData.edges.splice(edgeIndex, 1);drawGraph();reset(false);} else { alert("두 노드 사이에 간선이 존재하지 않습니다."); }}
     </script>
