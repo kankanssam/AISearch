@@ -51,8 +51,7 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            flex: 1;
-            min-width: 280px;
+            flex: 1; 
         }
 
         .visualization {
@@ -60,11 +59,10 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            flex: 2.5;
+            flex: 3; 
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-width: 300px;
         }
         
         #graph-svg {
@@ -200,7 +198,7 @@
         .edge { stroke: #999; stroke-width: 2; }
         .edge-cost { 
             fill: #555; 
-            font-size: 24px; 
+            font-size: 16px; 
             text-anchor: middle; 
             paint-order: stroke;
             stroke: #ffffff;
@@ -288,7 +286,7 @@
     </div>
 
     <footer>
-        <p>만든이 by 깐깐샘(2025. 9. 16일 수정)</p>
+        <p>만든이 by 깐깐샘(2025. 9. 18. 수정)</p>
     </footer>
 
     <script>
@@ -315,7 +313,8 @@
         let firstNodeForConnection = null;
 
         function generateRandomGraph() {
-            const numNodes = Math.floor(Math.random() * 5) + 3;
+            // [수정] 노드 개수를 5 또는 6으로 설정
+            const numNodes = Math.floor(Math.random() * 2) + 5; 
             const newNodes = {};
             const newEdges = [];
             const nodeIds = [];
@@ -345,7 +344,6 @@
                 for (const id in newNodes) {
                     const node = newNodes[id];
                     const distance = Math.sqrt(Math.pow(node.x - goalRefNode.x, 2) + Math.pow(node.y - goalRefNode.y, 2));
-                    // [변경] 휴리스틱 스케일 조정: (평균 간선 시각적 길이 / 평균 간선 비용) ≈ (240px / 8) = 30
                     node.h = Math.round(distance / 30);
                 }
             }
@@ -910,14 +908,12 @@
             graphData.nodes[nextChar] = { x, y, h: 0 }; 
             const nodeIds = Object.keys(graphData.nodes); 
             if(nodeIds.length > 1) { 
-                // 새 노드 추가 시 다른 모든 노드의 휴리스틱 값을 재계산할 기준 노드를 찾습니다.
                 const goalRefId = goalNode || nodeIds.find(id => id !== nextChar); 
                 const goalRefNode = graphData.nodes[goalRefId]; 
                 if (goalRefNode) {
                     for(const id in graphData.nodes) { 
                         const node = graphData.nodes[id]; 
                         const distance = Math.sqrt(Math.pow(node.x - goalRefNode.x, 2) + Math.pow(node.y - goalRefNode.y, 2)); 
-                        // [변경] 휴리스틱 스케일 조정
                         node.h = Math.round(distance / 30); 
                     } 
                 }
@@ -958,5 +954,3 @@
     </script>
 </body>
 </html>
-
-
